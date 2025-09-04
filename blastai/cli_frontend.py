@@ -63,107 +63,108 @@ async def run_cli_frontend(server_port: int):
 
 async def run_web_frontend(server_port: int, web_port: int):
     """Run web frontend."""
-    web_logger = logging.getLogger('web')
-    frontend_dir = Path(__file__).parent / 'frontend'
+    # web_logger = logging.getLogger('web')
+    # frontend_dir = Path(__file__).parent / 'frontend'
     
-    # Check Node.js and npm installation
-    if not check_node_installation():
-        web_logger.error("Node.js not found")
-        return
+    # # Check Node.js and npm installation
+    # if not check_node_installation():
+    #     web_logger.error("Node.js not found")
+    #     return
         
-    npm_cmd = check_npm_installation()
-    if not npm_cmd:
-        web_logger.error("npm not found")
-        return
+    # npm_cmd = check_npm_installation()
+    # if not npm_cmd:
+    #     web_logger.error("npm not found")
+    #     return
         
-    # Install dependencies if needed
-    if not (frontend_dir / 'node_modules').exists():
-        web_logger.info("Installing frontend dependencies...")
-        try:
-            result = subprocess.run(
-                [npm_cmd, 'install'],
-                cwd=frontend_dir,
-                capture_output=True,
-                text=True
-            )
-            if result.stdout:
-                web_logger.info(result.stdout)
-            if result.stderr:
-                web_logger.warning(result.stderr)
-        except subprocess.CalledProcessError as e:
-            web_logger.error(f"Error installing frontend dependencies: {e}")
-            return
+    # # Install dependencies if needed
+    # if not (frontend_dir / 'node_modules').exists():
+    #     web_logger.info("Installing frontend dependencies...")
+    #     try:
+    #         result = subprocess.run(
+    #             [npm_cmd, 'install'],
+    #             cwd=frontend_dir,
+    #             capture_output=True,
+    #             text=True
+    #         )
+    #         if result.stdout:
+    #             web_logger.info(result.stdout)
+    #         if result.stderr:
+    #             web_logger.warning(result.stderr)
+    #     except subprocess.CalledProcessError as e:
+    #         web_logger.error(f"Error installing frontend dependencies: {e}")
+    #         return
 
-    # Start frontend process
-    try:
-        frontend_env = os.environ.copy()
-        frontend_env['NEXT_PUBLIC_SERVER_PORT'] = str(server_port)
-        frontend_env['PORT'] = str(web_port)
+    # # Start frontend process
+    # try:
+    #     frontend_env = os.environ.copy()
+    #     frontend_env['NEXT_PUBLIC_SERVER_PORT'] = str(server_port)
+    #     frontend_env['PORT'] = str(web_port)
         
-        process = subprocess.Popen(
-            [npm_cmd, 'run', 'dev', f'--port={web_port}'],
-            cwd=frontend_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env=frontend_env
-        )
-    except subprocess.CalledProcessError as e:
-        web_logger.error(f"Error starting frontend: {e}")
-        return
+    #     process = subprocess.Popen(
+    #         [npm_cmd, 'run', 'dev', f'--port={web_port}'],
+    #         cwd=frontend_dir,
+    #         stdout=subprocess.PIPE,
+    #         stderr=subprocess.STDOUT,
+    #         text=True,
+    #         env=frontend_env
+    #     )
+    # except subprocess.CalledProcessError as e:
+    #     web_logger.error(f"Error starting frontend: {e}")
+    #     return
 
-    # Monitor frontend output
-    def log_output():
-        try:
-            for line in process.stdout:
-                line = line.strip()
-                if line:
-                    # Log based on content
-                    if any(x in line.lower() for x in ['error:', 'warn:', 'invalid']):
-                        web_logger.warning(f"Web: {line}")
-                    elif '✓ ready' in line:
-                        web_logger.info(f"Web: {line}")
-                    else:
-                        web_logger.debug(f"Web: {line}")
-        except (ValueError, IOError) as e:
-            web_logger.error(f"Error reading frontend output: {e}")
+    # # Monitor frontend output
+    # def log_output():
+    #     try:
+    #         for line in process.stdout:
+    #             line = line.strip()
+    #             if line:
+    #                 # Log based on content
+    #                 if any(x in line.lower() for x in ['error:', 'warn:', 'invalid']):
+    #                     web_logger.warning(f"Web: {line}")
+    #                 elif '✓ ready' in line:
+    #                     web_logger.info(f"Web: {line}")
+    #                 else:
+    #                     web_logger.debug(f"Web: {line}")
+    #     except (ValueError, IOError) as e:
+    #         web_logger.error(f"Error reading frontend output: {e}")
     
-    output_thread = threading.Thread(target=log_output, daemon=True)
-    output_thread.start()
+    # output_thread = threading.Thread(target=log_output, daemon=True)
+    # output_thread.start()
 
-    try:
-        while True:
-            await asyncio.sleep(1)
-    except asyncio.CancelledError:
-        web_logger.debug("Web frontend shutdown initiated")
+    # try:
+    #     while True:
+    #         await asyncio.sleep(1)
+    # except asyncio.CancelledError:
+    #     web_logger.debug("Web frontend shutdown initiated")
         
-        # Clean up process first
-        process.terminate()
-        try:
-            process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            try:
-                process.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                pass
+    #     # Clean up process first
+    #     process.terminate()
+    #     try:
+    #         process.wait(timeout=2)
+    #     except subprocess.TimeoutExpired:
+    #         process.kill()
+    #         try:
+    #             process.wait(timeout=1)
+    #         except subprocess.TimeoutExpired:
+    #             pass
             
-        # Close stdout to stop output thread
-        try:
-            process.stdout.close()
-        except:
-            pass
+    #     # Close stdout to stop output thread
+    #     try:
+    #         process.stdout.close()
+    #     except:
+    #         pass
             
-        # Wait briefly for output thread
-        output_thread.join(timeout=0.5)
+    #     # Wait briefly for output thread
+    #     output_thread.join(timeout=0.5)
         
-        # Don't re-raise, just return
-        return
-    finally:
-        # Final cleanup attempt
-        if process.poll() is None:
-            try:
-                process.kill()
-                process.wait(timeout=0.1)
-            except:
-                pass
+    #     # Don't re-raise, just return
+    #     return
+    # finally:
+    #     # Final cleanup attempt
+    #     if process.poll() is None:
+    #         try:
+    #             process.kill()
+    #             process.wait(timeout=0.1)
+    #         except:
+    #             pass
+    pass
