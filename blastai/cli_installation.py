@@ -123,6 +123,24 @@ Or using nvm (recommended):
         
     return npm_cmd
 
+def check_bun_installation() -> Optional[str]:
+    """Check if bun is installed and available."""
+    bun_cmd = find_executable('bun')
+    if not bun_cmd:
+        logger.error("Bun not found")
+        # Show installation instructions (essential user guidance)
+        logger.warning("""
+Bun not found. The web frontend requires Bun.
+
+To install Bun:
+1. Run the following command:
+    curl -fsSL https://bun.sh/install | bash
+2. Follow the instructions to add Bun to your PATH
+3. Run 'bun --version' to verify installation
+""")
+        return None
+    return bun_cmd
+
 def check_installation_state() -> Dict[str, bool]:
     """Check if browsers and dependencies are already installed."""
     state_file = get_appdata_dir() / "installation_state.json"

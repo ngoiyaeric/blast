@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 from openai import OpenAI
 
-from .cli_installation import check_node_installation, check_npm_installation
+from .cli_installation import check_bun_installation
 
 async def run_cli_frontend(server_port: int):
     """Run CLI frontend for interacting with BLAST.
@@ -66,14 +66,10 @@ async def run_web_frontend(server_port: int, web_port: int):
     web_logger = logging.getLogger('web')
     frontend_dir = Path(__file__).parent / 'frontend'
     
-    # Check Node.js and npm installation
-    if not check_node_installation():
-        web_logger.error("Node.js not found")
-        return
-        
-    npm_cmd = check_npm_installation()
-    if not npm_cmd:
-        web_logger.error("npm not found")
+    # Check Bun installation
+    bun_cmd = check_bun_installation()
+    if not bun_cmd:
+        web_logger.error("Bun not found")
         return
         
     # Install dependencies if needed
@@ -81,7 +77,7 @@ async def run_web_frontend(server_port: int, web_port: int):
         web_logger.info("Installing frontend dependencies...")
         try:
             result = subprocess.run(
-                [npm_cmd, 'install'],
+                [bun_cmd, 'install'],
                 cwd=frontend_dir,
                 capture_output=True,
                 text=True
@@ -101,7 +97,7 @@ async def run_web_frontend(server_port: int, web_port: int):
         frontend_env['PORT'] = str(web_port)
         
         process = subprocess.Popen(
-            [npm_cmd, 'run', 'dev', f'--port={web_port}'],
+            [bun_cmd, 'run', 'dev', f'--port={web_port}'],
             cwd=frontend_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
