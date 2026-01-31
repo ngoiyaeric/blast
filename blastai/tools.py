@@ -53,13 +53,15 @@ class Tools:
         self.controller = Controller(exclude_actions=exclude_actions)
         self.task_id = task_id
         self.cache_control = ""
+        self.communication_channel = None
         self.resource_manager = resource_manager
 
-        # Get parent task's cache control if available
+        # Get parent task's cache control and communication channel if available
         if scheduler and task_id:
             task = scheduler.tasks.get(task_id)
             if task:
                 self.cache_control = task.cache_options
+                self.communication_channel = task.communication_channel
 
         # Register tools based on available functionality
         if scheduler:
@@ -147,6 +149,50 @@ class Tools:
     def _register_subtask_tools(self, scheduler: Scheduler):
         """Register tools that require a scheduler."""
 
+        @self.controller.action("Share data with related browsers")
+        async def share_data(channel: str, data: str, target_task_ids: Optional[str] = None) -> ActionResult:
+            """Share data across browsers in the same problem space.
+
+            Args:
+                channel: Communication channel ID
+                data: Data to share (string)
+                target_task_ids: Optional comma-separated list of task IDs to share with.
+                               If not provided, shares with all tasks in the channel.
+            """
+            # Get all tasks in the same communication channel
+            related_tasks = [
+                task
+                for task in scheduler.tasks.values()
+                if task.communication_channel == channel and task.id != self.task_id
+            ]
+
+            # Filter by target_task_ids if provided
+            if target_task_ids:
+                targets = [tid.strip() for tid in target_task_ids.split(",")]
+                related_tasks = [task for task in related_tasks if task.id in targets]
+
+            # Update shared data for all related tasks
+            for task in related_tasks:
+                if not task.shared_data:
+                    task.shared_data = {}
+                task.shared_data[self.task_id] = data
+
+            return ActionResult(extracted_content=f"Data shared with {len(related_tasks)} browsers")
+
+        @self.controller.action("Get shared data from problem space")
+        async def get_shared_data(channel: str) -> ActionResult:
+            """Retrieve data shared by other browsers in the problem space.
+
+            Args:
+                channel: Communication channel ID
+            """
+            shared_data = {}
+            for task in scheduler.tasks.values():
+                if task.communication_channel == channel and task.shared_data:
+                    shared_data.update(task.shared_data)
+
+            return ActionResult(extracted_content=f"Shared data: {json.dumps(shared_data)}")
+
         @self.controller.action("Launch a subtask")
         async def launch_subtask(
             task: str, optional_initial_search_or_url: Optional[str] = None, num_copies: int = 1
@@ -172,6 +218,7 @@ class Tools:
                     parent_task_id=parent_task_id,
                     cache_control=self.cache_control,  # Inherit cache control from parent task
                     interactive_queues=self.interactive_queues,
+                    communication_channel=self.communication_channel,
                 )
 
                 # Set initial URL if provided

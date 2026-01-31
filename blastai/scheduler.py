@@ -47,7 +47,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import AsyncIterator, Dict, List, Optional, Union
+from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
 from browser_use.agent.views import AgentHistoryList
 
@@ -107,6 +107,8 @@ class TaskState:
     time_complete: Optional[datetime] = None
     initial_url: Optional[str] = None
     interactive_queues: Optional[Dict[str, asyncio.Queue]] = None  # Queues for interactive mode
+    communication_channel: Optional[str] = None  # Channel ID for related tasks
+    shared_data: Optional[Dict[str, Any]] = None  # Shared data for the task
     # TODO: Add stopped so that any stopped tasks or human-intervened tasks can only
     # permit executor reuse if there is a prerequisite task, can't be lineage based
 
@@ -193,6 +195,7 @@ class Scheduler:
         cache_control: str = "",
         interactive_queues: Optional[Dict[str, asyncio.Queue]] = None,
         initial_url: Optional[str] = None,
+        communication_channel: Optional[str] = None,
     ) -> str:
         """Schedule a new task.
 
@@ -221,6 +224,7 @@ class Scheduler:
             time_schedule=datetime.now(),
             interactive_queues=interactive_queues,
             initial_url=initial_url,
+            communication_channel=communication_channel,
         )
 
         # Add task to dictionary first
@@ -244,6 +248,7 @@ class Scheduler:
         cache_control: str = "",
         interactive_queues: Optional[Dict[str, asyncio.Queue]] = None,
         initial_url: Optional[str] = None,
+        communication_channel: Optional[str] = None,
     ) -> str:
         """Schedule a subtask of an existing task.
 
@@ -269,6 +274,7 @@ class Scheduler:
             cache_control=cache_control,
             interactive_queues=interactive_queues,
             initial_url=initial_url,
+            communication_channel=communication_channel,
         )
         return task_id
 
@@ -741,23 +747,39 @@ class Scheduler:
         if subtasks:
             groups.append(TaskPriorityGroup("subtask", subtasks))
 
-        # Group 3: Tasks with paused executors
-        paused_tasks = []
+        # Group 3: Channel tasks
+        channel_tasks = []
         for task_id in task_ids:
             if task_id not in cached_result_tasks and task_id not in cached_plan_tasks and task_id not in subtasks:
+                task = self.tasks[task_id]
+                if task.communication_channel:
+                    channel_tasks.append(task_id)
+        if channel_tasks:
+            groups.append(TaskPriorityGroup("channel", channel_tasks))
+
+        # Group 4: Tasks with paused executors
+        paused_tasks = []
+        for task_id in task_ids:
+            if (
+                task_id not in cached_result_tasks
+                and task_id not in cached_plan_tasks
+                and task_id not in subtasks
+                and task_id not in channel_tasks
+            ):
                 task = self.tasks[task_id]
                 if task.executor and hasattr(task.executor, "_paused") and task.executor._paused:
                     paused_tasks.append(task_id)
         if paused_tasks:
             groups.append(TaskPriorityGroup("resume", paused_tasks))
 
-        # Group 4: Remaining tasks (FIFO)
+        # Group 5: Remaining tasks (FIFO)
         remaining = [
             task_id
             for task_id in task_ids
             if task_id not in cached_result_tasks
             and task_id not in cached_plan_tasks
             and task_id not in subtasks
+            and task_id not in channel_tasks
             and task_id not in paused_tasks
         ]
         if remaining:
