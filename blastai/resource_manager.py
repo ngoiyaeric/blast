@@ -263,6 +263,34 @@ class ResourceManager:
 
         return True
 
+    def _prioritize_tasks_by_channel(self, task_ids: List[str]) -> List[str]:
+        """Sort tasks by communication channel density.
+
+        Channels with more tasks in the given list are prioritized.
+        Tasks without a channel come last.
+        """
+        channel_groups = {}
+        no_channel_tasks = []
+        for tid in task_ids:
+            task = self.scheduler.tasks[tid]
+            channel = task.communication_channel
+            if channel:
+                if channel not in channel_groups:
+                    channel_groups[channel] = []
+                channel_groups[channel].append(tid)
+            else:
+                no_channel_tasks.append(tid)
+
+        # Sort channels by number of tasks (descending)
+        sorted_channel_task_ids = sorted(channel_groups.values(), key=len, reverse=True)
+
+        # Flatten and append no-channel tasks
+        result = []
+        for ids in sorted_channel_task_ids:
+            result.extend(ids)
+        result.extend(no_channel_tasks)
+        return result
+
     def _calculate_max_new_executors(self) -> int:
         """Calculate maximum number of new executors that can be created given current constraints.
 
@@ -556,7 +584,9 @@ class ResourceManager:
                     if max_new_executors <= 0:
                         break
 
-                    tasks_to_allocate = group.task_ids[:max_new_executors]
+                    # Prioritize tasks within the group by communication channel density
+                    sorted_task_ids = self._prioritize_tasks_by_channel(group.task_ids)
+                    tasks_to_allocate = sorted_task_ids[:max_new_executors]
                     if not tasks_to_allocate:
                         continue
 
